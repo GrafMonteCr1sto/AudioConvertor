@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аудио Конвертор</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #0d6efd;
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        .formats-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .format-option {
+            flex: 1 1 calc(33.333% - 10px);
+            min-width: 100px;
+        }
+        .conversions-list {
+            margin-top: 30px;
+        }
+        .conversion-item {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 5px solid #6c757d;
+        }
+        .conversion-item.completed {
+            border-left-color: #198754;
+        }
+        .conversion-item.failed {
+            border-left-color: #dc3545;
+        }
+        .conversion-item.processing {
+            border-left-color: #0d6efd;
+        }
+        .conversion-file {
+            font-weight: bold;
+        }
+        .download-links {
+            margin-top: 10px;
+        }
+        .download-link {
+            display: inline-block;
+            margin-right: 10px;
+            margin-bottom: 5px;
+            transition: all 0.2s ease;
+        }
+        .download-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .btn-download-all {
+            background-color: #28a745;
+            color: white;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+        .btn-download-format {
+            border-color: #007bff;
+            color: #007bff;
+            border-radius: 4px;
+        }
+        .btn-download-format:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .debug-info {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        .files-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .upload-type-buttons {
+            margin-bottom: 15px;
+        }
+        .nav-tabs {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Аудио Конвертор</h1>
+        
+        <div class="debug-info mb-3 d-none" id="debugInfo">
+            <p class="mb-1"><strong>Состояние:</strong></p>
+            <div id="debugState"></div>
+        </div>
+        
+        <ul class="nav nav-tabs" id="uploadTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="single-file-tab" data-bs-toggle="tab" data-bs-target="#single-file" type="button" role="tab">
+                    Один файл
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="multiple-files-tab" data-bs-toggle="tab" data-bs-target="#multiple-files" type="button" role="tab">
+                    Несколько файлов
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="folder-tab" data-bs-toggle="tab" data-bs-target="#folder" type="button" role="tab">
+                    Папка
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="uploadTabContent">
+            <!-- Загрузка одного файла -->
+            <div class="tab-pane fade show active" id="single-file" role="tabpanel">
+                <div class="upload-area" id="singleUploadArea">
+                    <h5>Перетащите аудио файл сюда или нажмите для выбора</h5>
+                    <p class="text-muted">Поддерживаемые форматы: mp3, wav, ogg, flac, aac, m4a, wma</p>
+                    <input type="file" id="singleFileInput" class="d-none" accept=".mp3,.wav,.ogg,.flac,.aac,.m4a,.wma">
+                    <button class="btn btn-primary mt-2" id="browseSingleButton">Выбрать файл</button>
+                </div>
+                
+                <div id="singleFileInfo" class="alert alert-info d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span id="singleFileName"></span>
+                        <button class="btn btn-sm btn-outline-secondary" id="clearSingleFileButton">✕</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Загрузка нескольких файлов -->
+            <div class="tab-pane fade" id="multiple-files" role="tabpanel">
+                <div class="upload-area" id="multipleUploadArea">
+                    <h5>Перетащите аудио файлы сюда или нажмите для выбора</h5>
+                    <p class="text-muted">Поддерживаемые форматы: mp3, wav, ogg, flac, aac, m4a, wma</p>
+                    <input type="file" id="multipleFileInput" class="d-none" accept=".mp3,.wav,.ogg,.flac,.aac,.m4a,.wma" multiple>
+                    <button class="btn btn-primary mt-2" id="browseMultipleButton">Выбрать файлы</button>
+                </div>
+                
+                <div id="multipleFilesInfo" class="d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6><span id="filesCounter">0</span> файлов выбрано</h6>
+                        <button class="btn btn-sm btn-outline-secondary" id="clearMultipleFilesButton">Очистить все</button>
+                    </div>
+                    <div class="files-list" id="filesList"></div>
+                </div>
+            </div>
+            
+            <!-- Загрузка папки -->
+            <div class="tab-pane fade" id="folder" role="tabpanel">
+                <div class="upload-area" id="folderUploadArea">
+                    <h5>Перетащите папку с аудио файлами сюда или нажмите для выбора</h5>
+                    <p class="text-muted">Поддерживаемые форматы: mp3, wav, ogg, flac, aac, m4a, wma</p>
+                    <input type="file" id="folderInput" class="d-none" accept=".mp3,.wav,.ogg,.flac,.aac,.m4a,.wma" webkitdirectory directory multiple>
+                    <button class="btn btn-primary mt-2" id="browseFolderButton">Выбрать папку</button>
+                </div>
+                
+                <div id="folderInfo" class="d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6><span id="folderFilesCounter">0</span> файлов в папке</h6>
+                        <button class="btn btn-sm btn-outline-secondary" id="clearFolderButton">Очистить все</button>
+                    </div>
+                    <div class="files-list" id="folderFilesList"></div>
+                </div>
+            </div>
+        </div>
+        
+        <h5 class="mt-4">Выберите форматы для конвертации:</h5>
+        <div class="formats-container">
+            {% for format in target_formats %}
+            <div class="format-option form-check">
+                <input class="form-check-input format-checkbox" type="checkbox" value="{{ format }}" id="format_{{ format }}" name="formats">
+                <label class="form-check-label" for="format_{{ format }}">
+                    {{ format|upper }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <button class="btn btn-success w-100" id="convertButton">Конвертировать</button>
+        
+        <div class="conversions-list mt-4">
+            <h4>История конвертаций</h4>
+            <div id="conversionsStatus" class="alert alert-info d-none"></div>
+            <div id="conversionsList"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Переменные для работы с одним файлом
+            const singleUploadArea = document.getElementById('singleUploadArea');
+            const singleFileInput = document.getElementById('singleFileInput');
+            const browseSingleButton = document.getElementById('browseSingleButton');
+            const singleFileInfo = document.getElementById('singleFileInfo');
+            const singleFileName = document.getElementById('singleFileName');
+            const clearSingleFileButton = document.getElementById('clearSingleFileButton');
+            
+            // Переменные для работы с несколькими файлами
+            const multipleUploadArea = document.getElementById('multipleUploadArea');
+            const multipleFileInput = document.getElementById('multipleFileInput');
+            const browseMultipleButton = document.getElementById('browseMultipleButton');
+            const multipleFilesInfo = document.getElementById('multipleFilesInfo');
+            const filesCounter = document.getElementById('filesCounter');
+            const filesList = document.getElementById('filesList');
+            const clearMultipleFilesButton = document.getElementById('clearMultipleFilesButton');
+            
+            // Переменные для работы с папкой
+            const folderUploadArea = document.getElementById('folderUploadArea');
+            const folderInput = document.getElementById('folderInput');
+            const browseFolderButton = document.getElementById('browseFolderButton');
+            const folderInfo = document.getElementById('folderInfo');
+            const folderFilesCounter = document.getElementById('folderFilesCounter');
+            const folderFilesList = document.getElementById('folderFilesList');
+            const clearFolderButton = document.getElementById('clearFolderButton');
+            
+            // Общие переменные
+            const convertButton = document.getElementById('convertButton');
+            const conversionsList = document.getElementById('conversionsList');
+            const conversionsStatus = document.getElementById('conversionsStatus');
+            const debugInfo = document.getElementById('debugInfo');
+            const debugState = document.getElementById('debugState');
+            
+            // Для отладки покажем информацию о состоянии
+            debugInfo.classList.remove('d-none');
+            
+            const serverUrl = 'http://127.0.0.1:5000';
+            
+            // Хранилище выбранных файлов
+            const selectedFiles = {
+                single: null,
+                multiple: [],
+                folder: []
+            };
+            
+            // Текущий активный тип загрузки
+            let activeUploadType = 'single';
+            
+            // Переключение между табами
+            document.querySelectorAll('#uploadTabs button').forEach(tab => {
+                tab.addEventListener('click', function(e) {
+                    const targetId = this.getAttribute('data-bs-target').replace('#', '');
+                    activeUploadType = targetId === 'single-file' ? 'single' : (targetId === 'multiple-files' ? 'multiple' : 'folder');
+                    updateButtonState();
+                });
+            });
+            
+            // Первоначальное состояние
+            let hasFormats = false;
+            updateButtonState();
+            
+            // Функции для работы с одним файлом
+            singleUploadArea.addEventListener('click', (e) => {
+                if (e.target !== browseSingleButton && e.target.parentElement !== browseSingleButton) {
+                    singleFileInput.click();
+                }
+            });
+            
+            browseSingleButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                singleFileInput.click();
+            });
+            
+            singleUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                singleUploadArea.classList.add('dragover');
+            });
+            
+            singleUploadArea.addEventListener('dragleave', () => {
+                singleUploadArea.classList.remove('dragover');
+            });
+            
+            singleUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                singleUploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    handleSingleFileSelection(e.dataTransfer.files[0]);
+                }
+            });
+            
+            singleFileInput.addEventListener('change', (e) => {
+                console.log('Single file input changed', singleFileInput.files);
+                if (singleFileInput.files.length) {
+                    handleSingleFileSelection(singleFileInput.files[0]);
+                }
+            });
+            
+            clearSingleFileButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearSingleFile();
+            });
+            
+            function handleSingleFileSelection(file) {
+                console.log('Single file selected:', file.name);
+                selectedFiles.single = file;
+                singleFileName.textContent = file.name;
+                singleFileInfo.classList.remove('d-none');
+                updateButtonState();
+            }
+            
+            function clearSingleFile() {
+                singleFileInput.value = '';
+                singleFileInfo.classList.add('d-none');
+                selectedFiles.single = null;
+                updateButtonState();
+            }
+            
+            // Функции для работы с несколькими файлами
+            multipleUploadArea.addEventListener('click', (e) => {
+                if (e.target !== browseMultipleButton && e.target.parentElement !== browseMultipleButton) {
+                    multipleFileInput.click();
+                }
+            });
+            
+            browseMultipleButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                multipleFileInput.click();
+            });
+            
+            multipleUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                multipleUploadArea.classList.add('dragover');
+            });
+            
+            multipleUploadArea.addEventListener('dragleave', () => {
+                multipleUploadArea.classList.remove('dragover');
+            });
+            
+            multipleUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                multipleUploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    handleMultipleFilesSelection(e.dataTransfer.files);
+                }
+            });
+            
+            multipleFileInput.addEventListener('change', (e) => {
+                console.log('Multiple files input changed', multipleFileInput.files);
+                if (multipleFileInput.files.length) {
+                    handleMultipleFilesSelection(multipleFileInput.files);
+                }
+            });
+            
+            clearMultipleFilesButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearMultipleFiles();
+            });
+            
+            function handleMultipleFilesSelection(files) {
+                selectedFiles.multiple = Array.from(files).filter(file => {
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    return ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(extension);
+                });
+                
+                console.log('Multiple files selected:', selectedFiles.multiple.length);
+                filesCounter.textContent = selectedFiles.multiple.length;
+                multipleFilesInfo.classList.remove('d-none');
+                
+                // Отображаем список файлов
+                filesList.innerHTML = '';
+                selectedFiles.multiple.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <span>${file.name}</span>
+                        <span class="text-muted">${formatFileSize(file.size)}</span>
+                    `;
+                    filesList.appendChild(fileItem);
+                });
+                
+                updateButtonState();
+            }
+            
+            function clearMultipleFiles() {
+                multipleFileInput.value = '';
+                multipleFilesInfo.classList.add('d-none');
+                filesList.innerHTML = '';
+                selectedFiles.multiple = [];
+                updateButtonState();
+            }
+            
+            // Функции для работы с папкой
+            folderUploadArea.addEventListener('click', (e) => {
+                if (e.target !== browseFolderButton && e.target.parentElement !== browseFolderButton) {
+                    folderInput.click();
+                }
+            });
+            
+            browseFolderButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                folderInput.click();
+            });
+            
+            folderUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                folderUploadArea.classList.add('dragover');
+            });
+            
+            folderUploadArea.addEventListener('dragleave', () => {
+                folderUploadArea.classList.remove('dragover');
+            });
+            
+            folderUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                folderUploadArea.classList.remove('dragover');
+                
+                // Получаем список файлов из перетаскиваемых элементов
+                const items = e.dataTransfer.items;
+                if (items) {
+                    const files = [];
+                    for (let i = 0; i < items.length; i++) {
+                        const item = items[i].webkitGetAsEntry();
+                        if (item && item.isDirectory) {
+                            traverseDirectory(item, files);
+                        } else if (item && item.isFile) {
+                            item.file(file => {
+                                const extension = file.name.split('.').pop().toLowerCase();
+                                if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(extension)) {
+                                    files.push(file);
+                                    processFolderFiles(files);
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+            
+            folderInput.addEventListener('change', (e) => {
+                console.log('Folder input changed', folderInput.files);
+                if (folderInput.files.length) {
+                    handleFolderSelection(folderInput.files);
+                }
+            });
+            
+            clearFolderButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearFolder();
+            });
+            
+            function handleFolderSelection(files) {
+                selectedFiles.folder = Array.from(files).filter(file => {
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    return ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(extension);
+                });
+                
+                processFolderFiles(selectedFiles.folder);
+            }
+            
+            function processFolderFiles(files) {
+                console.log('Folder files selected:', files.length);
+                folderFilesCounter.textContent = files.length;
+                folderInfo.classList.remove('d-none');
+                
+                // Отображаем список файлов
+                folderFilesList.innerHTML = '';
+                files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <span>${file.name}</span>
+                        <span class="text-muted">${formatFileSize(file.size)}</span>
+                    `;
+                    folderFilesList.appendChild(fileItem);
+                });
+                
+                updateButtonState();
+            }
+            
+            function traverseDirectory(directory, fileList) {
+                const reader = directory.createReader();
+                reader.readEntries(entries => {
+                    entries.forEach(entry => {
+                        if (entry.isDirectory) {
+                            traverseDirectory(entry, fileList);
+                        } else {
+                            entry.file(file => {
+                                const extension = file.name.split('.').pop().toLowerCase();
+                                if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(extension)) {
+                                    fileList.push(file);
+                                    processFolderFiles(fileList);
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+            
+            function clearFolder() {
+                folderInput.value = '';
+                folderInfo.classList.add('d-none');
+                folderFilesList.innerHTML = '';
+                selectedFiles.folder = [];
+                updateButtonState();
+            }
+            
+            // Вспомогательные функции
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Байт';
+                const k = 1024;
+                const sizes = ['Байт', 'КБ', 'МБ', 'ГБ'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // Обработчики для выбора форматов
+            document.querySelectorAll('.format-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    console.log('Format checkbox changed', e.target.checked);
+                    updateFormatsState();
+                });
+            });
+            
+            // Обновление состояния выбранных форматов
+            function updateFormatsState() {
+                hasFormats = document.querySelectorAll('.format-checkbox:checked').length > 0;
+                updateButtonState();
+            }
+            
+            // Обновление состояния кнопки и отладочной информации
+            function updateButtonState() {
+                const hasFiles = getSelectedFilesCount() > 0;
+                console.log('Updating button state - Files:', hasFiles, 'Formats:', hasFormats);
+                
+                // Обновляем состояние кнопки
+                if (hasFiles && hasFormats) {
+                    convertButton.removeAttribute('disabled');
+                } else {
+                    convertButton.setAttribute('disabled', 'disabled');
+                }
+                
+                // Обновляем отладочную информацию
+                debugState.innerHTML = `
+                    <p>Тип загрузки: <strong>${activeUploadType}</strong></p>
+                    <p>Файлы выбраны: <strong>${hasFiles ? 'Да (' + getSelectedFilesCount() + ')' : 'Нет'}</strong></p>
+                    <p>Форматы выбраны: <strong>${hasFormats ? 'Да' : 'Нет'}</strong></p>
+                    <p>Кнопка активна: <strong>${!convertButton.disabled ? 'Да' : 'Нет'}</strong></p>
+                `;
+                
+                const selectedFormats = [...document.querySelectorAll('.format-checkbox:checked')].map(cb => cb.value);
+                debugState.innerHTML += `<p>Выбранные форматы: <strong>${selectedFormats.join(', ') || 'нет'}</strong></p>`;
+            }
+            
+            function getSelectedFilesCount() {
+                switch (activeUploadType) {
+                    case 'single':
+                        return selectedFiles.single ? 1 : 0;
+                    case 'multiple':
+                        return selectedFiles.multiple.length;
+                    case 'folder':
+                        return selectedFiles.folder.length;
+                    default:
+                        return 0;
+                }
+            }
+            
+            // Обработчик для кнопки конвертации
+            convertButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                if (getSelectedFilesCount() === 0) {
+                    alert('Выберите файлы для конвертации');
+                    return;
+                }
+                
+                const formats = [...document.querySelectorAll('.format-checkbox:checked')].map(cb => cb.value);
+                
+                if (formats.length === 0) {
+                    alert('Выберите хотя бы один формат для конвертации');
+                    return;
+                }
+                
+                convertButton.disabled = true;
+                convertButton.textContent = 'Загрузка файлов...';
+                
+                // Получаем файлы для загрузки в зависимости от активного режима
+                let filesToUpload = [];
+                switch (activeUploadType) {
+                    case 'single':
+                        filesToUpload = [selectedFiles.single];
+                        break;
+                    case 'multiple':
+                        filesToUpload = selectedFiles.multiple;
+                        break;
+                    case 'folder':
+                        filesToUpload = selectedFiles.folder;
+                        break;
+                }
+                
+                console.log('Отправка файлов на сервер', filesToUpload.length, 'файлов');
+                
+                // Отправляем файлы последовательно
+                let uploadedCount = 0;
+                let failedCount = 0;
+                
+                function uploadNextFile(index) {
+                    if (index >= filesToUpload.length) {
+                        // Все файлы загружены
+                        convertButton.textContent = 'Конвертировать';
+                        convertButton.disabled = false;
+                        
+                        // Очищаем выбранные файлы
+                        switch (activeUploadType) {
+                            case 'single':
+                                clearSingleFile();
+                                break;
+                            case 'multiple':
+                                clearMultipleFiles();
+                                break;
+                            case 'folder':
+                                clearFolder();
+                                break;
+                        }
+                        
+                        // Очищаем выбранные форматы
+                        document.querySelectorAll('.format-checkbox').forEach(cb => {
+                            cb.checked = false;
+                        });
+                        updateFormatsState();
+                        
+                        // Показываем результат
+                        alert(`Загрузка завершена: ${uploadedCount} файлов успешно, ${failedCount} с ошибками`);
+                        
+                        // Обновляем список конвертаций
+                        loadConversions();
+                        return;
+                    }
+                    
+                    const file = filesToUpload[index];
+                    convertButton.textContent = `Загрузка ${index + 1}/${filesToUpload.length}: ${file.name}`;
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formats.forEach(format => {
+                        formData.append('formats', format);
+                    });
+                    
+                    fetch(`${serverUrl}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Ошибка HTTP: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Ответ сервера:', data);
+                        if (data.error) {
+                            console.error('Ошибка загрузки:', data.error);
+                            failedCount++;
+                        } else {
+                            uploadedCount++;
+                        }
+                        // Переходим к следующему файлу
+                        uploadNextFile(index + 1);
+                    })
+                    .catch(error => {
+                        console.error('Ошибка:', error);
+                        failedCount++;
+                        // Переходим к следующему файлу даже при ошибке
+                        uploadNextFile(index + 1);
+                    });
+                }
+                
+                // Начинаем загрузку с первого файла
+                uploadNextFile(0);
+            });
+            
+            // Загрузка списка конвертаций
+            function loadConversions() {
+                conversionsStatus.classList.add('d-none');
+                
+                fetch(`${serverUrl}/conversions`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Ошибка HTTP: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Загружен список конвертаций:', data);
+                        
+                        conversionsList.innerHTML = '';
+                        
+                        if (data.length === 0) {
+                            conversionsList.innerHTML = '<p class="text-muted">Нет конвертаций</p>';
+                            return;
+                        }
+                        
+                        data.forEach(conv => {
+                            const item = document.createElement('div');
+                            item.className = `conversion-item ${conv.status}`;
+                            
+                            const date = new Date(conv.created_at);
+                            const formattedDate = date.toLocaleString();
+                            
+                            item.innerHTML = `
+                                <div class="conversion-file">${conv.original_filename}</div>
+                                <div class="text-muted small">
+                                    <span class="badge ${getStatusBadgeClass(conv.status)}">${getStatusText(conv.status)}</span>
+                                    <span class="ms-2">${formattedDate}</span>
+                                </div>
+                                <div class="small mt-1">Форматы: ${conv.target_formats.map(f => f.toUpperCase()).join(', ')}</div>
+                            `;
+                            
+                            // Если конвертация завершена, добавляем ссылки для скачивания
+                            if (conv.status === 'completed') {
+                                const downloadLinks = document.createElement('div');
+                                downloadLinks.className = 'download-links';
+                                
+                                // Добавляем кнопку для скачивания архива со всеми форматами
+                                if (conv.target_formats.length > 1) {
+                                    const allLink = document.createElement('a');
+                                    allLink.href = `${serverUrl}/batch-download/${conv.id}`;
+                                    allLink.className = 'download-link btn btn-sm btn-download-all mb-2 me-2';
+                                    allLink.innerHTML = '<i class="bi bi-download me-1"></i> Скачать все';
+                                    allLink.title = 'Скачать все форматы одним архивом';
+                                    allLink.target = '_blank';
+                                    downloadLinks.appendChild(allLink);
+                                }
+                                
+                                // Добавляем отдельные кнопки для каждого формата
+                                conv.target_formats.forEach(format => {
+                                    const link = document.createElement('a');
+                                    link.href = `${serverUrl}/download/${conv.id}/${format}`;
+                                    link.className = 'download-link btn btn-sm btn-download-format';
+                                    link.textContent = `Скачать ${format.toUpperCase()}`;
+                                    link.title = `Скачать в формате ${format.toUpperCase()}`;
+                                    link.target = '_blank'; // Открывать скачивание в новой вкладке
+                                    downloadLinks.appendChild(link);
+                                });
+                                
+                                item.appendChild(downloadLinks);
+                            }
+                            
+                            conversionsList.appendChild(item);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Ошибка при загрузке конвертаций:', error);
+                        conversionsStatus.innerHTML = `Ошибка при загрузке истории конвертаций: ${error.message}`;
+                        conversionsStatus.classList.remove('d-none');
+                    });
+            }
+            
+            function getStatusBadgeClass(status) {
+                switch (status) {
+                    case 'pending': return 'bg-warning';
+                    case 'processing': return 'bg-primary';
+                    case 'completed': return 'bg-success';
+                    case 'failed': return 'bg-danger';
+                    default: return 'bg-secondary';
+                }
+            }
+            
+            function getStatusText(status) {
+                switch (status) {
+                    case 'pending': return 'Ожидание';
+                    case 'processing': return 'Обработка';
+                    case 'completed': return 'Завершено';
+                    case 'failed': return 'Ошибка';
+                    default: return status;
+                }
+            }
+            
+            // Загружаем список конвертаций при загрузке страницы
+            loadConversions();
+            
+            // Инициализируем состояние форматов
+            updateFormatsState();
+            
+            // Запускаем периодическое обновление списка
+            setInterval(loadConversions, 5000);
+        });
+    </script>
+</body>
+</html> 
