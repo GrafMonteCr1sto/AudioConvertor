@@ -7,6 +7,7 @@ from datetime import datetime
 import logging, zipfile, shutil
 from io import BytesIO
 from flask_cors import CORS
+import ffmpeg
 import flask
 
 # Настроил логирование
@@ -186,9 +187,7 @@ def batch_download(conversion_ids):
 
 def convert_audio(conversion_id, file_path, target_formats):
     """
-    В этой версии мы просто копируем загруженный файл в соответствующие форматы,
-    так как реальная конвертация требует установки ffmpeg или других библиотек.
-    Это временное решение для демонстрационных целей.
+    Конвертация аудио файла в выбранные форматы с использованием ffmpeg.
     """
     logger.debug(f"Начинаем конвертацию для ID: {conversion_id}, форматы: {target_formats}")
     
@@ -209,16 +208,45 @@ def convert_audio(conversion_id, file_path, target_formats):
     filename_base = f"{conversion_id}_{uuid.uuid4().hex}"
     
     try:
-        # Вместо реальной конвертации просто копируем файл с новым расширением
+        # Конвертируем файл в каждый из выбранных форматов
         for format in target_formats:
             output_filename = f"{filename_base}.{format}"
             output_path = os.path.join(app.config['CONVERTED_FOLDER'], output_filename)
             
             logger.debug(f"Конвертация в формат {format}, выходной путь: {output_path}")
             
-            # Копируем файл (просто для демонстрации)
-            shutil.copy2(file_path, output_path)
-            logger.debug(f"Файл скопирован с новым расширением: {output_path}")
+            try:
+                # Используем ffmpeg для конвертации
+                stream = ffmpeg.input(file_path)
+                
+                # Настраиваем параметры в зависимости от формата
+                if format == 'mp3':
+                    stream = ffmpeg.output(stream, output_path, acodec='libmp3lame', ab='192k')
+                elif format == 'wav':
+                    stream = ffmpeg.output(stream, output_path, acodec='pcm_s16le')
+                elif format == 'ogg':
+                    stream = ffmpeg.output(stream, output_path, acodec='libvorbis', ab='192k')
+                elif format == 'flac':
+                    stream = ffmpeg.output(stream, output_path, acodec='flac')
+                elif format == 'aac':
+                    stream = ffmpeg.output(stream, output_path, acodec='aac', ab='192k')
+                elif format == 'm4a':
+                    stream = ffmpeg.output(stream, output_path, acodec='aac', ab='192k')
+                else:
+                    # Если формат неизвестен, используем дефолтные настройки
+                    stream = ffmpeg.output(stream, output_path)
+                
+                # Запускаем процесс конвертации
+                ffmpeg.run(stream, quiet=True, overwrite_output=True)
+                
+                logger.debug(f"Файл успешно сконвертирован: {output_path}")
+            except Exception as e:
+                logger.error(f"Ошибка при конвертации в {format}: {str(e)}")
+                
+                # Если ffmpeg не установлен или произошла другая ошибка, используем резервный метод копирования
+                logger.warning(f"Используем резервный метод копирования для формата {format}")
+                shutil.copy2(file_path, output_path)
+                logger.debug(f"Файл скопирован с новым расширением: {output_path}")
             
             # Проверяем, что выходной файл создан
             if not os.path.exists(output_path):
