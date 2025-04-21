@@ -7,6 +7,7 @@ from datetime import datetime
 import logging, zipfile, shutil
 from io import BytesIO
 from flask_cors import CORS
+import flask
 
 # Настроил логирование
 logging.basicConfig(level=logging.DEBUG)
@@ -165,17 +166,17 @@ def batch_download(conversion_ids):
         # Перемещаем указатель в начало файла
         memory_file.seek(0)
         
-        # Создаем ответ с ZIP архивом
-        response = send_from_directory(
-            app.config['CONVERTED_FOLDER'],
-            'batch_download.zip',
-            as_attachment=True,
-            download_name='converted_files.zip'
-        )
-        response.data = memory_file.read()
-        response.headers['Content-Type'] = 'application/zip'
-        response.headers['Content-Disposition'] = 'attachment; filename=converted_files.zip'
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        # Отправляем архив как ответ
+        response = jsonify({'error': 'No files to download'})
+        if memory_file.getbuffer().nbytes > 0:  # Проверяем, что архив не пустой
+            response = flask.Response(
+                memory_file.getvalue(),
+                mimetype='application/zip',
+                headers={
+                    'Content-Disposition': 'attachment; filename=converted_files.zip',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            )
         
         return response
         
